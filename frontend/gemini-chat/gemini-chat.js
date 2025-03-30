@@ -114,10 +114,16 @@ const ChefChat = {
                     
                     if (data.type === 'connection') {
                         console.log('Connection message:', data.message);
+                        this.speechBubble.textContent = data.message;
+                        this.speechBubble.classList.add('show');
+                        setTimeout(() => {
+                            this.speechBubble.classList.remove('show');
+                        }, 2000);
                         return;
                     }
                     
                     if (data.type === 'navigation') {
+                        console.log('Navigation requested:', data);
                         this.speechBubble.textContent = data.message;
                         this.speakMessage(data.message);
                         
@@ -126,6 +132,7 @@ const ChefChat = {
                         }, 1500);
                     } 
                     else if (data.type === 'info_and_navigate') {
+                        console.log('Info and navigation requested:', data);
                         this.speechBubble.textContent = data.message;
                         this.speakMessage(data.message);
                         
@@ -133,9 +140,18 @@ const ChefChat = {
                             window.location.href = `product.html?id=${data.productId}`;
                         }, 5000);
                     }
-                    else {
+                    else if (data.type === 'message') {
+                        console.log('Received message:', data.message);
                         this.speechBubble.textContent = data.message;
                         this.speakMessage(data.message);
+                    }
+                    else if (data.type === 'error') {
+                        console.error('Error received:', data.message);
+                        this.speechBubble.textContent = data.message;
+                        this.speechBubble.classList.add('show');
+                        setTimeout(() => {
+                            this.speechBubble.classList.remove('show');
+                        }, 3000);
                     }
 
                     // Trigger the scrolling text animation

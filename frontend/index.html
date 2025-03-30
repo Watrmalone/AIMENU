@@ -532,16 +532,16 @@
                 flex-direction: column;
                 padding: 20px;
                 justify-content: center;
-            }
+        }
 
-            .product-info {
+        .product-info {
                 margin: 0 0 40px 0;
                 text-align: center;
                 transform: translateY(0);
                 width: 100%;  /* Full width on mobile */
-            }
+        }
 
-            .product-name {
+        .product-name {
                 font-size: clamp(2rem, 8vw, 3rem);  /* Adjusted mobile font size */
                 white-space: nowrap;
                 overflow: hidden;
@@ -993,12 +993,12 @@
     <div class="overlay"></div>
 
     <div class="content">
-        <div class="container">
+    <div class="container">
             <div class="product-info">
                 <h1 class="product-name">Margherita Pizza</h1>
                 <p class="product-description">Classic Italian pizza with fresh tomatoes, mozzarella, basil, and olive oil</p>
                 <a href="product.html?id=pizza1" class="get-started">ORDER NOW</a>
-            </div>
+        </div>
 
             <div class="thumbnail-container">
                 <div class="thumbnail-wrapper">
@@ -1010,7 +1010,7 @@
                          data-image="https://images.unsplash.com/photo-1604068549290-dea0e4a305ca?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2000&q=80"
                          data-product-id="pizza1"
                          onerror="this.src='https://images.unsplash.com/photo-1604068549290-dea0e4a305ca?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80'">
-                </div>
+        </div>
                 
                 <div class="thumbnail-wrapper">
                     <img src="https://images.unsplash.com/photo-1628840042765-356cda07504e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80" 
@@ -1021,8 +1021,8 @@
                          data-image="https://images.unsplash.com/photo-1628840042765-356cda07504e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2000&q=80"
                          data-product-id="pizza2"
                          onerror="this.src='https://images.unsplash.com/photo-1628840042765-356cda07504e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80'">
-                </div>
-                
+    </div>
+
                 <div class="thumbnail-wrapper">
                     <img src="https://images.unsplash.com/photo-1511689660979-10d2b1aada49?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80" 
                          alt="Veggie" 
@@ -1092,7 +1092,7 @@
                 return null;
             }
         }
-        
+
         function updateContent(thumb) {
             mainImage.classList.add('switching');
             productInfo.classList.add('switching');
@@ -1131,14 +1131,14 @@
             thumbnailContainer.innerHTML = products.map((product, index) => `
                 <div class="thumbnail-wrapper ${index === 0 ? 'active' : ''}">
                     <img src="${product.image_url}" 
-                         alt="${product.name}" 
+                                        alt="${product.name}" 
                          class="thumbnail" 
                          data-name="${product.name}" 
                          data-description="${product.description}" 
                          data-image="${product.image_url}"
                          data-product-id="${product.id}"
                          onerror="this.src='https://images.unsplash.com/photo-1604068549290-dea0e4a305ca?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80'">
-                </div>
+                                </div>
             `).join('');
 
             // Update click events
@@ -1147,8 +1147,8 @@
                     document.querySelectorAll('.thumbnail-wrapper').forEach(w => w.classList.remove('active'));
                     wrapper.classList.add('active');
                     updateContent(wrapper.querySelector('.thumbnail'));
-                });
-            });
+                            });
+                        });
 
             // Update initial content
             const firstProduct = products[0];

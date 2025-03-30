@@ -75,6 +75,8 @@ wss.on('connection', (ws, req) => {
             try {
                 const data = JSON.parse(messageStr);
                 if (data.type === 'chat_message') {
+                    console.log('Received chat message:', data.message);
+                    
                     // Create a prompt for Gemini to be more conversational
                     const prompt = `You are a friendly and helpful restaurant assistant. You can engage in normal conversation, but you also have special abilities:
 
@@ -86,6 +88,8 @@ Our Menu Items:
 ${menuData.categories.map(cat => `
 ${cat.name}:
 ${cat.products.map(p => `- ${p.name} (ID: ${p.id})`).join('\n')}`).join('\n')}
+
+Customer Question: ${data.message}
 
 Be friendly and conversational in your responses. Only use special commands when needed:
 
@@ -103,9 +107,11 @@ Otherwise, just chat naturally!`;
                         model: "gemini-2.0-flash-lite",
                         generationConfig: {
                             temperature: 0.7,
-                            maxOutputTokens: 100,
+                            maxOutputTokens: 500,
                         }
                     });
+                    
+                    console.log('Sending prompt to Gemini:', prompt.substring(0, 200) + '...');
                     const result = await model.generateContent(prompt);
                     const response = await result.response;
                     const text = response.text();
@@ -142,6 +148,8 @@ Otherwise, just chat naturally!`;
                     // Check if this is a taste profile request
                     else if (text.startsWith('TASTE_PROFILE:')) {
                         const foodItem = text.split(':')[1];
+                        console.log('Analyzing taste profile for:', foodItem);
+                        
                         // Create a prompt for taste analysis
                         const tastePrompt = `You are a restaurant assistant helping to find similar menu items based on taste profiles. Your task is to:
 
@@ -157,12 +165,7 @@ ${cat.products.map(p => `- ${p.name} (ID: ${p.id})`).join('\n')}`).join('\n')}
 
 IMPORTANT: Your response should ONLY include the recommendation part. DO NOT include any taste profile analysis or percentages. Format your response exactly like this:
 
-Based on the taste profile of "${foodItem}", I recommend the {menu_item} from our menu. This dish shares similar characteristics with what you're looking for, particularly in terms of {mention 2-3 key taste characteristics that match}. NAVIGATE_TO_PRODUCT:{product_id}
-
-Example response:
-Based on the taste profile of "Shawarma", I recommend the Pepperoni Pizza from our menu. This dish shares similar characteristics with what you're looking for, particularly in terms of its savory umami flavor and rich, meaty profile. NAVIGATE_TO_PRODUCT:pizza2
-
-Remember: Only return the recommendation text followed by the navigation command. Do not include any taste profile analysis or percentages.`;
+Based on the taste profile of "${foodItem}", I recommend the {menu_item} from our menu. This dish shares similar characteristics with what you're looking for, particularly in terms of {mention 2-3 key taste characteristics that match}. NAVIGATE_TO_PRODUCT:{product_id}`;
                         
                         const tasteModel = genAI.getGenerativeModel({ 
                             model: "gemini-2.0-flash-lite",
@@ -171,6 +174,8 @@ Remember: Only return the recommendation text followed by the navigation command
                                 maxOutputTokens: 500,
                             }
                         });
+                        
+                        console.log('Sending taste prompt to Gemini:', tastePrompt.substring(0, 200) + '...');
                         const tasteResult = await tasteModel.generateContent(tastePrompt);
                         const tasteResponse = await tasteResult.response;
                         const tasteText = tasteResponse.text();
