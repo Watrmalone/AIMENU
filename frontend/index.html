@@ -1261,6 +1261,11 @@
         window.addEventListener('gemini-response', (event) => {
             updateGeminiResponse(event.detail.text);
         });
+
+        // Initialize the chat widget when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            ChefChat.init();
+        });
     </script>
 </body>
 </html> 

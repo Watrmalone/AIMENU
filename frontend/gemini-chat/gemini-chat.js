@@ -225,9 +225,9 @@ const ChefChat = {
         style.textContent = `
             #chef-chat-container {
                 position: fixed;
-                top: 35px;
-                left: 150px;
-                z-index: 1001;
+                top: 20px;
+                left: 20px;
+                z-index: 9999;
             }
 
             .chef-chat-button {
@@ -253,8 +253,8 @@ const ChefChat = {
             }
 
             .chef-hat-icon {
-                width: 20px;
-                height: 20px;
+                width: 24px;
+                height: 24px;
                 margin-right: 2px;
                 flex-shrink: 0;
             }
@@ -279,66 +279,19 @@ const ChefChat = {
 
             .speech-bubble {
                 position: absolute;
-                top: 100%;
+                top: 60px;
                 left: 0;
-                transform: translateY(-10px);
-                margin-top: 10px;
-                padding: 15px 20px;
-                background: rgba(44, 24, 16, 0.85);
-                backdrop-filter: blur(10px);
-                -webkit-backdrop-filter: blur(10px);
+                background: white;
+                padding: 15px;
                 border-radius: 15px;
-                color: var(--accent);
-                font-size: 0.95rem;
-                line-height: 1.5;
-                min-width: 300px;
-                max-width: 500px;
-                width: auto;
-                opacity: 0;
-                transition: all 0.3s ease;
-                pointer-events: none;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+                max-width: 300px;
                 display: none;
-                border: 1px solid rgba(212, 176, 140, 0.2);
-                box-shadow: 
-                    0 8px 32px rgba(0, 0, 0, 0.1),
-                    inset 0 0 0 1px rgba(212, 176, 140, 0.1);
-                white-space: normal;
-                word-wrap: break-word;
+                z-index: 9999;
             }
 
-            .speech-bubble::before {
-                content: '';
-                position: absolute;
-                top: -8px;
-                left: 20px;
-                transform: rotate(45deg);
-                width: 16px;
-                height: 16px;
-                background: rgba(44, 24, 16, 0.85);
-                backdrop-filter: blur(10px);
-                -webkit-backdrop-filter: blur(10px);
-                border: 1px solid rgba(212, 176, 140, 0.2);
-                box-shadow: 
-                    4px 4px 8px rgba(0, 0, 0, 0.1),
-                    inset 0 0 0 1px rgba(212, 176, 140, 0.1);
-            }
-
-            .speech-bubble.show {
-                opacity: 1;
-                transform: translateY(0);
+            .speech-bubble.active {
                 display: block;
-                animation: fadeIn 0.3s ease;
-            }
-
-            @keyframes fadeIn {
-                from {
-                    opacity: 0;
-                    transform: translateY(-10px);
-                }
-                to {
-                    opacity: 1;
-                    transform: translateY(0);
-                }
             }
 
             @keyframes pulse {
