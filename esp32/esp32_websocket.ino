@@ -2,23 +2,17 @@
 #include <WebSocketsClient.h>
 
 // WiFi credentials
-const char* ssid = "Dethe 2.4G";
-const char* password = "Dethe@1803.";
+const char* ssid = "AIMENU";
+const char* password = "aimenu123";
 
 // WebSocket server details
-const char* websocket_server = "192.168.1.6";
-const uint16_t websocket_port = 8080;
+const char* websocket_server = "ai-menu-backend.onrender.com";
+const int websocket_port = 443;  // Using HTTPS port for secure connection
 
 WebSocketsClient webSocket;
-bool isConnected = false;
 
 void setup() {
-    // Initialize Serial for debugging
     Serial.begin(115200);
-    delay(1000);
-    
-    Serial.println("\nESP32 WebSocket Client");
-    Serial.println("---------------------");
     
     // Connect to WiFi
     WiFi.begin(ssid, password);
@@ -29,13 +23,12 @@ void setup() {
         Serial.print(".");
     }
     
-    Serial.println("\nWiFi Connected!");
+    Serial.println("\nConnected to WiFi");
     Serial.print("IP Address: ");
     Serial.println(WiFi.localIP());
     
-    // Connect to WebSocket server
-    Serial.println("Connecting to WebSocket server...");
-    webSocket.begin(websocket_server, websocket_port, "/");
+    // Setup WebSocket
+    webSocket.begin(websocket_server, websocket_port, "/ws", "wss");
     webSocket.onEvent(webSocketEvent);
     webSocket.setReconnectInterval(5000);
     webSocket.enableHeartbeat(15000, 3000, 2);
@@ -43,68 +36,55 @@ void setup() {
 
 void loop() {
     webSocket.loop();
-
-    // If WiFi is disconnected, try to reconnect
+    
+    // Check WiFi connection
     if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("WiFi disconnected! Reconnecting...");
-        WiFi.reconnect();
-        delay(1000);
+        Serial.println("WiFi disconnected. Reconnecting...");
+        WiFi.begin(ssid, password);
+        while (WiFi.status() != WL_CONNECTED) {
+            delay(500);
+            Serial.print(".");
+        }
+        Serial.println("\nReconnected to WiFi");
     }
 }
 
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     switch(type) {
         case WStype_DISCONNECTED:
-            Serial.println("Disconnected from WebSocket server!");
-            isConnected = false;
+            Serial.println("Disconnected from WebSocket");
             break;
             
         case WStype_CONNECTED:
-            Serial.println("Connected to WebSocket server!");
-            isConnected = true;
-            // Send identification message
-            webSocket.sendTXT("ESP32 Ready");
+            Serial.println("Connected to WebSocket");
+            // Send ESP32 identification message
+            webSocket.sendTXT("ESP32");
             break;
             
-        case WStype_TEXT: {
-            String message = String((char*)payload);
-            Serial.println("----------------------------------------");
-            Serial.print("Received message: ");
-            Serial.println(message);
-            
-            // Check if it's a motor command
-            if (message.startsWith("MOTOR:")) {
-                String codeStr = message.substring(6); // Skip "MOTOR:"
-                int code = codeStr.toInt();
-                Serial.print("Received code: ");
-                Serial.println(code);
+        case WStype_TEXT:
+            {
+                String message = String((char*)payload);
+                Serial.println("Received message: " + message);
                 
-                // Here you can add code to handle the motor number
-                // For now, we'll just print it
-                Serial.print("Motor category: ");
-                switch(code) {
-                    case 1:
-                        Serial.println("Pizza");
-                        break;
-                    case 2:
-                        Serial.println("Burger");
-                        break;
-                    case 3:
-                        Serial.println("Fries");
-                        break;
-                    case 4:
-                        Serial.println("Dessert");
-                        break;
-                    default:
-                        Serial.println("Unknown category");
+                // Check if it's a motor command
+                if (message.startsWith("MOTOR:")) {
+                    String category = message.substring(6); // Remove "MOTOR:" prefix
+                    Serial.println("Motor command received for category: " + category);
+                    // Here you would add your motor control code
                 }
             }
-            Serial.println("----------------------------------------");
             break;
-        }
             
         case WStype_ERROR:
-            Serial.println("WebSocket error occurred!");
+            Serial.println("WebSocket error");
+            break;
+            
+        case WStype_PING:
+            Serial.println("Received ping");
+            break;
+            
+        case WStype_PONG:
+            Serial.println("Received pong");
             break;
     }
 } 
