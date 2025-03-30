@@ -91,28 +91,39 @@ wss.on('connection', (ws, req) => {
                     console.log('Received chat message:', data.message);
                     
                     // Create a prompt for Gemini to be more conversational
-                    const prompt = `You are a restaurant assistant specifically trained to help customers with our menu. You have been trained with our specific menu data and should use it to provide accurate responses.
+                    const prompt = `You are a friendly and helpful restaurant assistant. You can engage in normal conversation, but you also have special abilities:
 
-Our Menu Data:
-${JSON.stringify(menuData, null, 2)}
+1. You can answer questions about our menu items
+2. You can help customers find similar items based on taste preferences
+3. You can help navigate to specific menu items
 
-IMPORTANT INSTRUCTIONS:
-1. You MUST use the menu data above to provide responses
-2. When a customer mentions any food item:
-   - IMMEDIATELY analyze its taste profile
-   - Find the SINGLE closest matching item from our menu
-   - Navigate to that item
-   - DO NOT ask questions or give multiple options
-3. For navigation:
-   - Use the exact product IDs from our menu data
-   - Format: "NAVIGATE_TO_PRODUCT:{product_id}"
-4. For taste profile analysis:
-   - Format: "TASTE_PROFILE:{food_item}"
-   - Then provide a single recommendation with navigation
+Available Categories:
+${menuData.categories.map(cat => `- ${cat.name}`).join('\n')}
+
+Available Products (with their IDs):
+${menuData.categories.map(cat => `
+${cat.name}:
+${cat.products.map(p => `- ${p.name} (ID: ${p.id})`).join('\n')}`).join('\n')}
+
+IMPORTANT: When a customer mentions a food item (whether it's on our menu or not), immediately:
+1. Create a taste profile for that food
+2. Find the closest matching item from our menu (ONLY recommend items that are actually on our menu)
+3. Navigate to that item
+
+For taste profile analysis and navigation:
+- If they mention any food item, respond with: "TASTE_PROFILE:{food_item}"
+- After analyzing the taste profile, you MUST include a navigation command to the recommended product
+- Format: "Based on the taste profile, I recommend {menu_item}. NAVIGATE_TO_PRODUCT:{product_id}"
+- When recommending a product, be conversational and mention why it's a good match
+
+Example responses:
+1. For food mention: "I'll analyze the taste profile of Shawarma and find you a similar item from our menu. TASTE_PROFILE:Shawarma"
+2. For direct navigation: "I'll take you to the Margherita Pizza. NAVIGATE_TO_PRODUCT:pizza1"
+3. For info and navigation: "The Margherita Pizza is a classic Italian pizza with fresh tomatoes and mozzarella. INFO_AND_NAVIGATE:pizza1:The Margherita Pizza is a classic Italian pizza with fresh tomatoes and mozzarella"
 
 Customer Question: ${data.message}
 
-Remember: You have been trained with our specific menu data. Use it to provide accurate responses.`;
+Otherwise, just chat naturally!`;
                     
                     const model = genAI.getGenerativeModel({ 
                         model: "gemini-2.0-flash-lite",
@@ -457,28 +468,49 @@ async function testApiConnection() {
 app.post('/api/chat', async (req, res) => {
     try {
         const { message } = req.body;
-        const menuPrompt = createMenuPrompt();
         
-        const chat = model.startChat({
-            history: [
-                {
-                    role: "user",
-                    parts: menuPrompt
-                }
-            ],
+        // Create a structured prompt for the chat
+        const prompt = `You are a restaurant assistant specifically trained to help customers with our menu. You have been trained with our specific menu data and should use it to provide accurate responses.
+
+Our Menu Data:
+${JSON.stringify(menuData, null, 2)}
+
+IMPORTANT INSTRUCTIONS:
+1. You MUST use the menu data above to provide responses
+2. When a customer mentions any food item:
+   - IMMEDIATELY analyze its taste profile
+   - Find the SINGLE closest matching item from our menu
+   - Navigate to that item
+   - DO NOT ask questions or give multiple options
+3. For navigation:
+   - Use the exact product IDs from our menu data
+   - Format: "NAVIGATE_TO_PRODUCT:{product_id}"
+4. For taste profile analysis:
+   - Format: "TASTE_PROFILE:{food_item}"
+   - Then provide a single recommendation with navigation
+
+Customer Question: ${message}
+
+Remember: You have been trained with our specific menu data. Use it to provide accurate responses.`;
+        
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-2.0-flash-lite",
             generationConfig: {
                 temperature: 0.7,
                 maxOutputTokens: 500,
-            },
+            }
         });
-
-        const result = await chat.sendMessage(message);
-        const response = result.response.text();
-        console.log('Gemini response:', response); // Debug log
-
+        
+        console.log('Sending prompt to Gemini:', prompt.substring(0, 200) + '...');
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        
+        console.log('Gemini Response:', text);
+        
         // Check if this is a taste profile request
-        if (response.includes('TASTE_PROFILE:')) {
-            const foodItem = response.split('TASTE_PROFILE:')[1].split('\n')[0].trim();
+        if (text.includes('TASTE_PROFILE:')) {
+            const foodItem = text.split('TASTE_PROFILE:')[1].split('\n')[0].trim();
             console.log('Analyzing taste profile for:', foodItem);
             
             // Create a prompt for taste analysis
@@ -510,6 +542,8 @@ DO NOT:
                     maxOutputTokens: 500,
                 }
             });
+            
+            console.log('Sending taste prompt to Gemini:', tastePrompt.substring(0, 200) + '...');
             const tasteResult = await tasteModel.generateContent(tastePrompt);
             const tasteResponse = await tasteResult.response;
             const tasteText = tasteResponse.text();
@@ -539,8 +573,8 @@ DO NOT:
             }
         }
         // Check if the response is a navigation command
-        else if (response.includes('NAVIGATE_TO_PRODUCT:')) {
-            const productId = response.split('NAVIGATE_TO_PRODUCT:')[1].split('\n')[0].trim();
+        else if (text.includes('NAVIGATE_TO_PRODUCT:')) {
+            const productId = text.split('NAVIGATE_TO_PRODUCT:')[1].split('\n')[0].trim();
             console.log('Navigation requested for product:', productId);
             res.json({ 
                 type: 'navigation',
@@ -549,8 +583,8 @@ DO NOT:
             });
         } 
         // Check if the response is a combined info and navigation command
-        else if (response.includes('INFO_AND_NAVIGATE:')) {
-            const parts = response.split('INFO_AND_NAVIGATE:')[1].split('\n')[0].trim().split(':');
+        else if (text.includes('INFO_AND_NAVIGATE:')) {
+            const parts = text.split('INFO_AND_NAVIGATE:')[1].split('\n')[0].trim().split(':');
             const productId = parts[0];
             const info = parts.slice(1).join(':');
             
@@ -565,7 +599,7 @@ DO NOT:
         else {
             res.json({ 
                 type: 'message',
-                message: response 
+                message: text 
             });
         }
     } catch (error) {
