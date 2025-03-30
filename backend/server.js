@@ -78,37 +78,28 @@ wss.on('connection', (ws, req) => {
                     console.log('Received chat message:', data.message);
                     
                     // Create a prompt for Gemini to be more conversational
-                    const prompt = `You are a friendly and helpful restaurant assistant. You can engage in normal conversation, but you also have special abilities:
+                    const prompt = `You are a restaurant assistant specifically trained to help customers with our menu. You have been trained with our specific menu data and should use it to provide accurate responses.
 
-1. You can answer questions about our menu items
-2. You can help customers find similar items based on taste preferences
-3. You can help navigate to specific menu items
+Our Menu Data:
+${JSON.stringify(menuData, null, 2)}
 
-Our Menu Items:
-${menuData.categories.map(cat => `
-${cat.name}:
-${cat.products.map(p => `- ${p.name} (ID: ${p.id})`).join('\n')}`).join('\n')}
+IMPORTANT INSTRUCTIONS:
+1. You MUST use the menu data above to provide responses
+2. When a customer mentions any food item:
+   - IMMEDIATELY analyze its taste profile
+   - Find the SINGLE closest matching item from our menu
+   - Navigate to that item
+   - DO NOT ask questions or give multiple options
+3. For navigation:
+   - Use the exact product IDs from our menu data
+   - Format: "NAVIGATE_TO_PRODUCT:{product_id}"
+4. For taste profile analysis:
+   - Format: "TASTE_PROFILE:{food_item}"
+   - Then provide a single recommendation with navigation
 
 Customer Question: ${data.message}
 
-IMPORTANT: When a customer mentions any food item (whether it's on our menu or not):
-1. IMMEDIATELY analyze its taste profile
-2. Find the SINGLE closest matching item from our menu
-3. Navigate to that item
-4. DO NOT ask questions or give multiple options
-5. DO NOT ask what they like about the food
-
-For taste profile analysis:
-- If they mention any food item, respond with: "TASTE_PROFILE:{food_item}"
-- After analyzing the taste profile, you MUST include a navigation command to the recommended product
-- Format: "Based on the taste profile, I recommend {menu_item}. NAVIGATE_TO_PRODUCT:{product_id}"
-- When recommending a product, be conversational and mention why it's a good match
-
-For navigation:
-- If they want to see a specific item, respond with: "NAVIGATE_TO_PRODUCT:{product_id}"
-- If they want both info and navigation, respond with: "INFO_AND_NAVIGATE:{product_id}:{your response}"
-
-Otherwise, just chat naturally!`;
+Remember: You have been trained with our specific menu data. Use it to provide accurate responses.`;
                     
                     const model = genAI.getGenerativeModel({ 
                         model: "gemini-2.0-flash-lite",
@@ -158,27 +149,26 @@ Otherwise, just chat naturally!`;
                         console.log('Analyzing taste profile for:', foodItem);
                         
                         // Create a prompt for taste analysis
-                        const tastePrompt = `You are a restaurant assistant helping to find similar menu items based on taste profiles. Your task is to:
+                        const tastePrompt = `You are a restaurant assistant specifically trained to analyze taste profiles and find matching menu items. You have been trained with our specific menu data.
 
-1. Analyze the following food request: "${foodItem}"
-2. Create a taste profile internally (DO NOT include this in your response)
+Our Menu Data:
+${JSON.stringify(menuData, null, 2)}
+
+IMPORTANT INSTRUCTIONS:
+1. You MUST use the menu data above to find matches
+2. Analyze the following food request: "${foodItem}"
 3. Find the SINGLE closest matching item from our menu
 4. Return ONLY the recommendation with navigation command
 
-Available Menu Items:
-${menuData.categories.map(cat => `
-${cat.name}:
-${cat.products.map(p => `- ${p.name} (ID: ${p.id})`).join('\n')}`).join('\n')}
-
-IMPORTANT: Your response should ONLY include the recommendation part. DO NOT include any taste profile analysis or percentages. Format your response exactly like this:
-
+Format your response exactly like this:
 Based on the taste profile of "${foodItem}", I recommend the {menu_item} from our menu. This dish shares similar characteristics with what you're looking for, particularly in terms of {mention 2-3 key taste characteristics that match}. NAVIGATE_TO_PRODUCT:{product_id}
 
 DO NOT:
 - Ask questions about what they like about the food
 - Give multiple options
 - Include any taste profile analysis or percentages
-- Ask for preferences or additional information`;
+- Ask for preferences or additional information
+- Use any product IDs that are not in our menu data`;
                         
                         const tasteModel = genAI.getGenerativeModel({ 
                             model: "gemini-2.0-flash-lite",
@@ -304,12 +294,21 @@ const model = genAI.getGenerativeModel({
 let menuData = null;
 try {
     const menuPath = path.join(__dirname, 'menu.json');
-    menuData = JSON.parse(fs.readFileSync(menuPath, 'utf8'));
+    console.log('Attempting to load menu data from:', menuPath);
+    const menuContent = fs.readFileSync(menuPath, 'utf8');
+    console.log('Menu file content length:', menuContent.length);
+    menuData = JSON.parse(menuContent);
     console.log('Menu data loaded successfully');
     console.log('Categories:', menuData.categories.map(cat => cat.name));
     console.log('Total products:', menuData.categories.reduce((acc, cat) => acc + cat.products.length, 0));
 } catch (error) {
     console.error('Error loading menu data:', error);
+    console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        path: path.join(__dirname, 'menu.json')
+    });
+    process.exit(1); // Exit if menu data can't be loaded
 }
 
 // Create a map for quick access to products by ID
@@ -470,27 +469,26 @@ app.post('/api/chat', async (req, res) => {
             console.log('Analyzing taste profile for:', foodItem);
             
             // Create a prompt for taste analysis
-            const tastePrompt = `You are a restaurant assistant helping to find similar menu items based on taste profiles. Your task is to:
+            const tastePrompt = `You are a restaurant assistant specifically trained to analyze taste profiles and find matching menu items. You have been trained with our specific menu data.
 
-1. Analyze the following food request: "${foodItem}"
-2. Create a taste profile internally (DO NOT include this in your response)
+Our Menu Data:
+${JSON.stringify(menuData, null, 2)}
+
+IMPORTANT INSTRUCTIONS:
+1. You MUST use the menu data above to find matches
+2. Analyze the following food request: "${foodItem}"
 3. Find the SINGLE closest matching item from our menu
 4. Return ONLY the recommendation with navigation command
 
-Available Menu Items:
-${menuData.categories.map(cat => `
-${cat.name}:
-${cat.products.map(p => `- ${p.name} (ID: ${p.id})`).join('\n')}`).join('\n')}
-
-IMPORTANT: Your response should ONLY include the recommendation part. DO NOT include any taste profile analysis or percentages. Format your response exactly like this:
-
+Format your response exactly like this:
 Based on the taste profile of "${foodItem}", I recommend the {menu_item} from our menu. This dish shares similar characteristics with what you're looking for, particularly in terms of {mention 2-3 key taste characteristics that match}. NAVIGATE_TO_PRODUCT:{product_id}
 
 DO NOT:
 - Ask questions about what they like about the food
 - Give multiple options
 - Include any taste profile analysis or percentages
-- Ask for preferences or additional information`;
+- Ask for preferences or additional information
+- Use any product IDs that are not in our menu data`;
             
             const tasteModel = genAI.getGenerativeModel({ 
                 model: "gemini-2.0-flash-lite",
