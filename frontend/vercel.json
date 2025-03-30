@@ -1,18 +1,14 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "*.html",
-      "use": "@vercel/static"
-    }
-  ],
   "routes": [
+    {
+      "src": "/gemini-chat/(.*)",
+      "dest": "/gemini-chat/$1"
+    },
     {
       "src": "/(.*)",
       "dest": "/$1"
     }
   ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+  "public": true
 } 

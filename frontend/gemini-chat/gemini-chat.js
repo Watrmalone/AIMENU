@@ -13,36 +13,51 @@ const ChefChat = {
 
     // Initialize the chat
     init() {
-        if (this.isInitialized) return;
+        console.log('Initializing Chef Chat...'); // Debug log
+        
+        if (this.isInitialized) {
+            console.log('Already initialized, skipping...'); // Debug log
+            return;
+        }
 
-        // Create container
-        this.container = document.createElement('div');
-        this.container.id = 'chef-chat-container';
-        this.container.innerHTML = `
-            <button class="chef-chat-button" title="Click to start/stop recording">
-                <svg class="chef-hat-icon" viewBox="0 0 512 512" width="24" height="24">
-                    <path fill="currentColor" d="M425.5 125.3c0-44.5-36.1-80.6-80.6-80.6-16.6 0-32 5-44.9 13.5C284.7 22.3 249.2 0 208.8 0c-40.4 0-75.9 22.3-91.2 58.2-12.9-8.5-28.3-13.5-44.9-13.5-44.5 0-80.6 36.1-80.6 80.6 0 23.6 10.2 44.8 26.4 59.5v161.7c0 27.4 22.2 49.6 49.6 49.6h281.4c27.4 0 49.6-22.2 49.6-49.6V184.8c16.2-14.7 26.4-35.9 26.4-59.5z"/>
-                </svg>
-                <span>CHEF CHAT</span>
-            </button>
-            <div class="speech-bubble"></div>
-        `;
-        document.body.appendChild(this.container);
+        // Get existing container if it exists
+        this.container = document.getElementById('chef-chat-container');
+        
+        if (!this.container) {
+            console.log('Creating new container...'); // Debug log
+            // Create container
+            this.container = document.createElement('div');
+            this.container.id = 'chef-chat-container';
+            this.container.innerHTML = `
+                <button class="chef-chat-button" title="Click to start/stop recording">
+                    <svg class="chef-hat-icon" viewBox="0 0 512 512" width="24" height="24">
+                        <path fill="currentColor" d="M425.5 125.3c0-44.5-36.1-80.6-80.6-80.6-16.6 0-32 5-44.9 13.5C284.7 22.3 249.2 0 208.8 0c-40.4 0-75.9 22.3-91.2 58.2-12.9-8.5-28.3-13.5-44.9-13.5-44.5 0-80.6 36.1-80.6 80.6 0 23.6 10.2 44.8 26.4 59.5v161.7c0 27.4 22.2 49.6 49.6 49.6h281.4c27.4 0 49.6-22.2 49.6-49.6V184.8c16.2-14.7 26.4-35.9 26.4-59.5z"/>
+                    </svg>
+                    <span>CHEF CHAT</span>
+                </button>
+                <div class="speech-bubble"></div>
+            `;
+            document.body.appendChild(this.container);
+        }
 
         // Get references to elements
         this.chatButton = this.container.querySelector('.chef-chat-button');
         this.speechBubble = this.container.querySelector('.speech-bubble');
 
+        console.log('Initializing speech recognition...'); // Debug log
         // Initialize speech recognition
         this.initializeSpeechRecognition();
 
+        console.log('Adding styles...'); // Debug log
         // Add styles
         this.addStyles();
 
+        console.log('Initializing event listeners...'); // Debug log
         // Initialize event listeners
         this.initializeEventListeners();
 
         this.isInitialized = true;
+        console.log('Chef Chat initialization complete!'); // Debug log
     },
 
     // Initialize speech recognition
@@ -120,7 +135,7 @@ const ChefChat = {
         this.isProcessing = true;
 
         try {
-            const response = await fetch('http://localhost:3000/api/chat', {
+            const response = await fetch('https://ai-menu-backend.onrender.com/api/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -305,7 +320,22 @@ const ChefChat = {
 
     // Initialize event listeners
     initializeEventListeners() {
-        this.chatButton.addEventListener('click', () => this.toggleRecording());
+        // Remove any existing event listeners
+        this.chatButton.removeEventListener('click', this.toggleRecording.bind(this));
+        
+        // Add click event listener to the chat button
+        this.chatButton.addEventListener('click', () => {
+            console.log('Chat button clicked'); // Debug log
+            this.toggleRecording();
+        });
+
+        // Add keyboard shortcut (Spacebar)
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !this.isTyping) {
+                e.preventDefault();
+                this.toggleRecording();
+            }
+        });
     }
 };
 
