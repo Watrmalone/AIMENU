@@ -10,6 +10,7 @@ const ChefChat = {
     selectedVoice: null,
     speaking: false,
     currentSpeech: null,
+    ws: null,
 
     // Initialize the chat
     init() {
@@ -19,6 +20,9 @@ const ChefChat = {
             console.log('Already initialized, skipping...'); // Debug log
             return;
         }
+
+        // Initialize WebSocket connection
+        this.initializeWebSocket();
 
         // Get existing container if it exists
         this.container = document.getElementById('chef-chat-container');
@@ -58,6 +62,63 @@ const ChefChat = {
 
         this.isInitialized = true;
         console.log('Chef Chat initialization complete!'); // Debug log
+    },
+
+    // Initialize WebSocket connection
+    initializeWebSocket() {
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//ai-menu-backend.onrender.com/ws`;
+        
+        console.log('Connecting to WebSocket:', wsUrl);
+        this.ws = new WebSocket(wsUrl);
+
+        this.ws.onopen = () => {
+            console.log('WebSocket connected');
+        };
+
+        this.ws.onclose = () => {
+            console.log('WebSocket disconnected, attempting to reconnect...');
+            setTimeout(() => this.initializeWebSocket(), 3000);
+        };
+
+        this.ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+        };
+
+        this.ws.onmessage = (event) => {
+            console.log('Received message:', event.data);
+            try {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'navigation') {
+                    this.speechBubble.textContent = data.message;
+                    this.speakMessage(data.message);
+                    
+                    setTimeout(() => {
+                        window.location.href = `product.html?id=${data.productId}`;
+                    }, 1500);
+                } 
+                else if (data.type === 'info_and_navigate') {
+                    this.speechBubble.textContent = data.message;
+                    this.speakMessage(data.message);
+                    
+                    setTimeout(() => {
+                        window.location.href = `product.html?id=${data.productId}`;
+                    }, 5000);
+                }
+                else {
+                    this.speechBubble.textContent = data.message;
+                    this.speakMessage(data.message);
+                }
+
+                // Trigger the scrolling text animation
+                window.dispatchEvent(new CustomEvent('gemini-response', {
+                    detail: { text: data.message }
+                }));
+            } catch (error) {
+                console.error('Error parsing WebSocket message:', error);
+            }
+        };
     },
 
     // Initialize speech recognition
@@ -132,75 +193,16 @@ const ChefChat = {
     async handleSpeechInput(transcript) {
         this.speechBubble.textContent = transcript;
         this.speechBubble.classList.add('show');
-        this.isProcessing = true;
 
-        try {
-            console.log('Sending request to backend:', transcript); // Debug log
-            const response = await fetch('https://ai-menu-backend.onrender.com/api/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'Origin': window.location.origin
-                },
-                credentials: 'include',
-                body: JSON.stringify({ 
-                    message: transcript,
-                    timestamp: new Date().toISOString()
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            console.log('Received response:', data); // Debug log
-
-            if (!data || !data.message) {
-                throw new Error('Invalid response format from server');
-            }
-
-            // Handle different response types
-            if (data.type === 'navigation') {
-                console.log('Navigation requested for product:', data.productId); // Debug log
-                this.speechBubble.textContent = data.message;
-                this.speakMessage(data.message);
-                
-                // Navigate after a short delay
-                setTimeout(() => {
-                    console.log('Navigating to:', `product.html?id=${data.productId}`); // Debug log
-                    window.location.href = `product.html?id=${data.productId}`;
-                }, 1500);
-            } 
-            else if (data.type === 'info_and_navigate') {
-                console.log('Info and navigation requested for product:', data.productId); // Debug log
-                this.speechBubble.textContent = data.message;
-                this.speakMessage(data.message);
-                
-                // Navigate after a longer delay to allow for the info to be heard
-                setTimeout(() => {
-                    console.log('Navigating to:', `product.html?id=${data.productId}`); // Debug log
-                    window.location.href = `product.html?id=${data.productId}`;
-                }, 5000);
-            }
-            else {
-                // Handle regular message
-                this.speechBubble.textContent = data.message;
-                this.speakMessage(data.message);
-            }
-
-            // Trigger the scrolling text animation
-            window.dispatchEvent(new CustomEvent('gemini-response', {
-                detail: { text: data.message }
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            console.log('Sending message to WebSocket:', transcript);
+            this.ws.send(JSON.stringify({
+                type: 'chat_message',
+                message: transcript
             }));
-
-        } catch (error) {
-            console.error('Error in handleSpeechInput:', error);
-            this.speechBubble.textContent = `Error: ${error.message}. Please try again.`;
-            this.speechBubble.classList.add('show');
-        } finally {
-            // Auto-hide speech bubble after 4 seconds
+        } else {
+            console.error('WebSocket is not connected');
+            this.speechBubble.textContent = 'Connection error. Please try again in a moment.';
             setTimeout(() => {
                 this.speechBubble.classList.remove('show');
             }, 4000);
