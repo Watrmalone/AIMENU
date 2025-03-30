@@ -91,15 +91,22 @@ ${cat.products.map(p => `- ${p.name} (ID: ${p.id})`).join('\n')}`).join('\n')}
 
 Customer Question: ${data.message}
 
-Be friendly and conversational in your responses. Only use special commands when needed:
+IMPORTANT: When a customer mentions any food item (whether it's on our menu or not):
+1. IMMEDIATELY analyze its taste profile
+2. Find the SINGLE closest matching item from our menu
+3. Navigate to that item
+4. DO NOT ask questions or give multiple options
+5. DO NOT ask what they like about the food
+
+For taste profile analysis:
+- If they mention any food item, respond with: "TASTE_PROFILE:{food_item}"
+- After analyzing the taste profile, you MUST include a navigation command to the recommended product
+- Format: "Based on the taste profile, I recommend {menu_item}. NAVIGATE_TO_PRODUCT:{product_id}"
+- When recommending a product, be conversational and mention why it's a good match
 
 For navigation:
 - If they want to see a specific item, respond with: "NAVIGATE_TO_PRODUCT:{product_id}"
 - If they want both info and navigation, respond with: "INFO_AND_NAVIGATE:{product_id}:{your response}"
-
-For taste profile analysis:
-- If they ask about a food item not on our menu, analyze its taste characteristics and recommend a similar item from our menu
-- Format the taste profile response as: "TASTE_PROFILE:{food_item}"
 
 Otherwise, just chat naturally!`;
                     
@@ -155,7 +162,7 @@ Otherwise, just chat naturally!`;
 
 1. Analyze the following food request: "${foodItem}"
 2. Create a taste profile internally (DO NOT include this in your response)
-3. Find the closest matching item from our menu
+3. Find the SINGLE closest matching item from our menu
 4. Return ONLY the recommendation with navigation command
 
 Available Menu Items:
@@ -165,7 +172,13 @@ ${cat.products.map(p => `- ${p.name} (ID: ${p.id})`).join('\n')}`).join('\n')}
 
 IMPORTANT: Your response should ONLY include the recommendation part. DO NOT include any taste profile analysis or percentages. Format your response exactly like this:
 
-Based on the taste profile of "${foodItem}", I recommend the {menu_item} from our menu. This dish shares similar characteristics with what you're looking for, particularly in terms of {mention 2-3 key taste characteristics that match}. NAVIGATE_TO_PRODUCT:{product_id}`;
+Based on the taste profile of "${foodItem}", I recommend the {menu_item} from our menu. This dish shares similar characteristics with what you're looking for, particularly in terms of {mention 2-3 key taste characteristics that match}. NAVIGATE_TO_PRODUCT:{product_id}
+
+DO NOT:
+- Ask questions about what they like about the food
+- Give multiple options
+- Include any taste profile analysis or percentages
+- Ask for preferences or additional information`;
                         
                         const tasteModel = genAI.getGenerativeModel({ 
                             model: "gemini-2.0-flash-lite",
@@ -461,7 +474,7 @@ app.post('/api/chat', async (req, res) => {
 
 1. Analyze the following food request: "${foodItem}"
 2. Create a taste profile internally (DO NOT include this in your response)
-3. Find the closest matching item from our menu
+3. Find the SINGLE closest matching item from our menu
 4. Return ONLY the recommendation with navigation command
 
 Available Menu Items:
@@ -473,10 +486,11 @@ IMPORTANT: Your response should ONLY include the recommendation part. DO NOT inc
 
 Based on the taste profile of "${foodItem}", I recommend the {menu_item} from our menu. This dish shares similar characteristics with what you're looking for, particularly in terms of {mention 2-3 key taste characteristics that match}. NAVIGATE_TO_PRODUCT:{product_id}
 
-Example response:
-Based on the taste profile of "Shawarma", I recommend the Pepperoni Pizza from our menu. This dish shares similar characteristics with what you're looking for, particularly in terms of its savory umami flavor and rich, meaty profile. NAVIGATE_TO_PRODUCT:pizza2
-
-Remember: Only return the recommendation text followed by the navigation command. Do not include any taste profile analysis or percentages.`;
+DO NOT:
+- Ask questions about what they like about the food
+- Give multiple options
+- Include any taste profile analysis or percentages
+- Ask for preferences or additional information`;
             
             const tasteModel = genAI.getGenerativeModel({ 
                 model: "gemini-2.0-flash-lite",
