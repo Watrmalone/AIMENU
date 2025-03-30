@@ -97,25 +97,35 @@ ${menuData.categories.map(cat => `
 ${cat.name}:
 ${cat.products.map(p => `- ${p.name} (ID: ${p.id})`).join('\n')}`).join('\n')}
 
-Be friendly and conversational in your responses. Only use special commands when needed:
+IMPORTANT: When a customer mentions a food item (whether it's on our menu or not), immediately:
+1. Create a taste profile for that food
+2. Find the closest matching item from our menu (ONLY recommend items that are actually on our menu)
+3. Navigate to that item
 
-For navigation:
-- If they want to see a specific item, respond with: "NAVIGATE_TO_PRODUCT:{product_id}"
-- If they want both info and navigation, respond with: "INFO_AND_NAVIGATE:{product_id}:{your response}"
+For taste profile analysis and navigation:
+- If they mention any food item, respond with: "TASTE_PROFILE:{food_item}"
+- After analyzing the taste profile, you MUST include a navigation command to the recommended product
+- Format: "Based on the taste profile, I recommend {menu_item}. NAVIGATE_TO_PRODUCT:{product_id}"
+- When recommending a product, be conversational and mention why it's a good match
 
-For taste profile analysis:
-- If they ask about a food item not on our menu, analyze its taste characteristics and recommend a similar item from our menu
-- Format the taste profile response as: "TASTE_PROFILE:{food_item}"
+Example responses:
+1. For food mention: "I'll analyze the taste profile of Shawarma and find you a similar item from our menu. TASTE_PROFILE:Shawarma"
+2. For direct navigation: "I'll take you to the Margherita Pizza. NAVIGATE_TO_PRODUCT:pizza1"
+3. For info and navigation: "The Margherita Pizza is a classic Italian pizza with fresh tomatoes and mozzarella. INFO_AND_NAVIGATE:pizza1:The Margherita Pizza is a classic Italian pizza with fresh tomatoes and mozzarella"
 
-Otherwise, just chat naturally!`;
+Customer Question: ${data.message}
+
+Remember: When they mention any food item, immediately analyze its taste profile and find a matching item from our menu.`;
                     
                     const model = genAI.getGenerativeModel({ 
                         model: "gemini-2.0-flash-lite",
                         generationConfig: {
                             temperature: 0.7,
-                            maxOutputTokens: 100,
+                            maxOutputTokens: 500,
                         }
                     });
+                    
+                    console.log('Sending prompt to Gemini:', prompt.substring(0, 200) + '...');
                     const result = await model.generateContent(prompt);
                     const response = await result.response;
                     const text = response.text();
@@ -150,8 +160,10 @@ Otherwise, just chat naturally!`;
                         }));
                     }
                     // Check if this is a taste profile request
-                    else if (text.startsWith('TASTE_PROFILE:')) {
-                        const foodItem = text.split(':')[1];
+                    else if (text.includes('TASTE_PROFILE:')) {
+                        const foodItem = text.split('TASTE_PROFILE:')[1].split('\n')[0].trim();
+                        console.log('Analyzing taste profile for:', foodItem);
+                        
                         // Create a prompt for taste analysis
                         const tastePrompt = `You are a restaurant assistant helping to find similar menu items based on taste profiles. Your task is to:
 
@@ -181,6 +193,8 @@ Remember: Only return the recommendation text followed by the navigation command
                                 maxOutputTokens: 500,
                             }
                         });
+                        
+                        console.log('Sending taste prompt to Gemini:', tastePrompt.substring(0, 200) + '...');
                         const tasteResult = await tasteModel.generateContent(tastePrompt);
                         const tasteResponse = await tasteResult.response;
                         const tasteText = tasteResponse.text();
