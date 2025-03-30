@@ -468,49 +468,29 @@ async function testApiConnection() {
 app.post('/api/chat', async (req, res) => {
     try {
         const { message } = req.body;
+        const menuPrompt = createMenuPrompt();
         
-        // Create a structured prompt for the chat
-        const prompt = `You are a restaurant assistant specifically trained to help customers with our menu. You have been trained with our specific menu data and should use it to provide accurate responses.
-
-Our Menu Data:
-${JSON.stringify(menuData, null, 2)}
-
-IMPORTANT INSTRUCTIONS:
-1. You MUST use the menu data above to provide responses
-2. When a customer mentions any food item:
-   - IMMEDIATELY analyze its taste profile
-   - Find the SINGLE closest matching item from our menu
-   - Navigate to that item
-   - DO NOT ask questions or give multiple options
-3. For navigation:
-   - Use the exact product IDs from our menu data
-   - Format: "NAVIGATE_TO_PRODUCT:{product_id}"
-4. For taste profile analysis:
-   - Format: "TASTE_PROFILE:{food_item}"
-   - Then provide a single recommendation with navigation
-
-Customer Question: ${message}
-
-Remember: You have been trained with our specific menu data. Use it to provide accurate responses.`;
-        
-        const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.0-flash-lite",
+        const chat = model.startChat({
+            history: [
+                {
+                    role: "user",
+                    parts: menuPrompt
+                }
+            ],
             generationConfig: {
                 temperature: 0.7,
+                candidateCount: 1,
                 maxOutputTokens: 500,
             }
         });
         
-        console.log('Sending prompt to Gemini:', prompt.substring(0, 200) + '...');
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
-        
-        console.log('Gemini Response:', text);
+        const result = await chat.sendMessage(message);
+        const response = result.response.text();
+        console.log('Gemini response:', response); // Debug log
         
         // Check if this is a taste profile request
-        if (text.includes('TASTE_PROFILE:')) {
-            const foodItem = text.split('TASTE_PROFILE:')[1].split('\n')[0].trim();
+        if (response.includes('TASTE_PROFILE:')) {
+            const foodItem = response.split('TASTE_PROFILE:')[1].split('\n')[0].trim();
             console.log('Analyzing taste profile for:', foodItem);
             
             // Create a prompt for taste analysis
@@ -573,8 +553,8 @@ DO NOT:
             }
         }
         // Check if the response is a navigation command
-        else if (text.includes('NAVIGATE_TO_PRODUCT:')) {
-            const productId = text.split('NAVIGATE_TO_PRODUCT:')[1].split('\n')[0].trim();
+        else if (response.includes('NAVIGATE_TO_PRODUCT:')) {
+            const productId = response.split('NAVIGATE_TO_PRODUCT:')[1].split('\n')[0].trim();
             console.log('Navigation requested for product:', productId);
             res.json({ 
                 type: 'navigation',
@@ -583,8 +563,8 @@ DO NOT:
             });
         } 
         // Check if the response is a combined info and navigation command
-        else if (text.includes('INFO_AND_NAVIGATE:')) {
-            const parts = text.split('INFO_AND_NAVIGATE:')[1].split('\n')[0].trim().split(':');
+        else if (response.includes('INFO_AND_NAVIGATE:')) {
+            const parts = response.split('INFO_AND_NAVIGATE:')[1].split('\n')[0].trim().split(':');
             const productId = parts[0];
             const info = parts.slice(1).join(':');
             
@@ -599,7 +579,7 @@ DO NOT:
         else {
             res.json({ 
                 type: 'message',
-                message: text 
+                message: response 
             });
         }
     } catch (error) {
