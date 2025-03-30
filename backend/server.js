@@ -11,7 +11,7 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// CORS configuration
+// CORS configuration for Render deployment
 app.use(cors({
     origin: (origin, callback) => {
         const allowedOrigins = [
@@ -53,10 +53,7 @@ wss.on('connection', (ws, req) => {
     console.log(`New WebSocket connection from ${clientIp}`);
     
     // Send immediate welcome message
-    ws.send(JSON.stringify({
-        type: 'connection',
-        message: 'Connected to AI Menu Server'
-    }));
+    ws.send('SERVER_READY');
     
     // Setup ping-pong for connection keepalive
     ws.isAlive = true;
@@ -88,8 +85,6 @@ wss.on('connection', (ws, req) => {
             try {
                 const data = JSON.parse(messageStr);
                 if (data.type === 'chat_message') {
-                    console.log('Received chat message:', data.message);
-                    
                     // Create a prompt for Gemini to be more conversational
                     const prompt = `You are a friendly and helpful restaurant assistant. You can engage in normal conversation, but you also have special abilities:
 
@@ -97,31 +92,20 @@ wss.on('connection', (ws, req) => {
 2. You can help customers find similar items based on taste preferences
 3. You can help navigate to specific menu items
 
-Available Categories:
-${menuData.categories.map(cat => `- ${cat.name}`).join('\n')}
-
-Available Products (with their IDs):
+Our Menu Items:
 ${menuData.categories.map(cat => `
 ${cat.name}:
 ${cat.products.map(p => `- ${p.name} (ID: ${p.id})`).join('\n')}`).join('\n')}
 
-IMPORTANT: When a customer mentions a food item (whether it's on our menu or not), immediately:
-1. Create a taste profile for that food
-2. Find the closest matching item from our menu (ONLY recommend items that are actually on our menu)
-3. Navigate to that item
+Be friendly and conversational in your responses. Only use special commands when needed:
 
-For taste profile analysis and navigation:
-- If they mention any food item, respond with: "TASTE_PROFILE:{food_item}"
-- After analyzing the taste profile, you MUST include a navigation command to the recommended product
-- Format: "Based on the taste profile, I recommend {menu_item}. NAVIGATE_TO_PRODUCT:{product_id}"
-- When recommending a product, be conversational and mention why it's a good match
+For navigation:
+- If they want to see a specific item, respond with: "NAVIGATE_TO_PRODUCT:{product_id}"
+- If they want both info and navigation, respond with: "INFO_AND_NAVIGATE:{product_id}:{your response}"
 
-Example responses:
-1. For food mention: "I'll analyze the taste profile of Shawarma and find you a similar item from our menu. TASTE_PROFILE:Shawarma"
-2. For direct navigation: "I'll take you to the Margherita Pizza. NAVIGATE_TO_PRODUCT:pizza1"
-3. For info and navigation: "The Margherita Pizza is a classic Italian pizza with fresh tomatoes and mozzarella. INFO_AND_NAVIGATE:pizza1:The Margherita Pizza is a classic Italian pizza with fresh tomatoes and mozzarella"
-
-Customer Question: ${data.message}
+For taste profile analysis:
+- If they ask about a food item not on our menu, analyze its taste characteristics and recommend a similar item from our menu
+- Format the taste profile response as: "TASTE_PROFILE:{food_item}"
 
 Otherwise, just chat naturally!`;
                     
@@ -129,11 +113,9 @@ Otherwise, just chat naturally!`;
                         model: "gemini-2.0-flash-lite",
                         generationConfig: {
                             temperature: 0.7,
-                            maxOutputTokens: 500,
+                            maxOutputTokens: 100,
                         }
                     });
-                    
-                    console.log('Sending prompt to Gemini:', prompt.substring(0, 200) + '...');
                     const result = await model.generateContent(prompt);
                     const response = await result.response;
                     const text = response.text();
@@ -170,29 +152,27 @@ Otherwise, just chat naturally!`;
                     // Check if this is a taste profile request
                     else if (text.startsWith('TASTE_PROFILE:')) {
                         const foodItem = text.split(':')[1];
-                        console.log('Analyzing taste profile for:', foodItem);
-                        
                         // Create a prompt for taste analysis
-                        const tastePrompt = `You are a restaurant assistant specifically trained to analyze taste profiles and find matching menu items. You have been trained with our specific menu data.
+                        const tastePrompt = `You are a restaurant assistant helping to find similar menu items based on taste profiles. Your task is to:
 
-Our Menu Data:
-${JSON.stringify(menuData, null, 2)}
-
-IMPORTANT INSTRUCTIONS:
-1. You MUST use the menu data above to find matches
-2. Analyze the following food request: "${foodItem}"
-3. Find the SINGLE closest matching item from our menu
+1. Analyze the following food request: "${foodItem}"
+2. Create a taste profile internally (DO NOT include this in your response)
+3. Find the closest matching item from our menu
 4. Return ONLY the recommendation with navigation command
 
-Format your response exactly like this:
+Available Menu Items:
+${menuData.categories.map(cat => `
+${cat.name}:
+${cat.products.map(p => `- ${p.name} (ID: ${p.id})`).join('\n')}`).join('\n')}
+
+IMPORTANT: Your response should ONLY include the recommendation part. DO NOT include any taste profile analysis or percentages. Format your response exactly like this:
+
 Based on the taste profile of "${foodItem}", I recommend the {menu_item} from our menu. This dish shares similar characteristics with what you're looking for, particularly in terms of {mention 2-3 key taste characteristics that match}. NAVIGATE_TO_PRODUCT:{product_id}
 
-DO NOT:
-- Ask questions about what they like about the food
-- Give multiple options
-- Include any taste profile analysis or percentages
-- Ask for preferences or additional information
-- Use any product IDs that are not in our menu data`;
+Example response:
+Based on the taste profile of "Shawarma", I recommend the Pepperoni Pizza from our menu. This dish shares similar characteristics with what you're looking for, particularly in terms of its savory umami flavor and rich, meaty profile. NAVIGATE_TO_PRODUCT:pizza2
+
+Remember: Only return the recommendation text followed by the navigation command. Do not include any taste profile analysis or percentages.`;
                         
                         const tasteModel = genAI.getGenerativeModel({ 
                             model: "gemini-2.0-flash-lite",
@@ -201,8 +181,6 @@ DO NOT:
                                 maxOutputTokens: 500,
                             }
                         });
-                        
-                        console.log('Sending taste prompt to Gemini:', tastePrompt.substring(0, 200) + '...');
                         const tasteResult = await tasteModel.generateContent(tastePrompt);
                         const tasteResponse = await tasteResult.response;
                         const tasteText = tasteResponse.text();
@@ -318,21 +296,12 @@ const model = genAI.getGenerativeModel({
 let menuData = null;
 try {
     const menuPath = path.join(__dirname, 'menu.json');
-    console.log('Attempting to load menu data from:', menuPath);
-    const menuContent = fs.readFileSync(menuPath, 'utf8');
-    console.log('Menu file content length:', menuContent.length);
-    menuData = JSON.parse(menuContent);
+    menuData = JSON.parse(fs.readFileSync(menuPath, 'utf8'));
     console.log('Menu data loaded successfully');
     console.log('Categories:', menuData.categories.map(cat => cat.name));
     console.log('Total products:', menuData.categories.reduce((acc, cat) => acc + cat.products.length, 0));
 } catch (error) {
     console.error('Error loading menu data:', error);
-    console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        path: path.join(__dirname, 'menu.json')
-    });
-    process.exit(1); // Exit if menu data can't be loaded
 }
 
 // Create a map for quick access to products by ID
@@ -479,41 +448,40 @@ app.post('/api/chat', async (req, res) => {
             ],
             generationConfig: {
                 temperature: 0.7,
-                candidateCount: 1,
                 maxOutputTokens: 500,
-            }
+            },
         });
-        
+
         const result = await chat.sendMessage(message);
         const response = result.response.text();
         console.log('Gemini response:', response); // Debug log
-        
+
         // Check if this is a taste profile request
         if (response.includes('TASTE_PROFILE:')) {
             const foodItem = response.split('TASTE_PROFILE:')[1].split('\n')[0].trim();
             console.log('Analyzing taste profile for:', foodItem);
             
             // Create a prompt for taste analysis
-            const tastePrompt = `You are a restaurant assistant specifically trained to analyze taste profiles and find matching menu items. You have been trained with our specific menu data.
+            const tastePrompt = `You are a restaurant assistant helping to find similar menu items based on taste profiles. Your task is to:
 
-Our Menu Data:
-${JSON.stringify(menuData, null, 2)}
-
-IMPORTANT INSTRUCTIONS:
-1. You MUST use the menu data above to find matches
-2. Analyze the following food request: "${foodItem}"
-3. Find the SINGLE closest matching item from our menu
+1. Analyze the following food request: "${foodItem}"
+2. Create a taste profile internally (DO NOT include this in your response)
+3. Find the closest matching item from our menu
 4. Return ONLY the recommendation with navigation command
 
-Format your response exactly like this:
+Available Menu Items:
+${menuData.categories.map(cat => `
+${cat.name}:
+${cat.products.map(p => `- ${p.name} (ID: ${p.id})`).join('\n')}`).join('\n')}
+
+IMPORTANT: Your response should ONLY include the recommendation part. DO NOT include any taste profile analysis or percentages. Format your response exactly like this:
+
 Based on the taste profile of "${foodItem}", I recommend the {menu_item} from our menu. This dish shares similar characteristics with what you're looking for, particularly in terms of {mention 2-3 key taste characteristics that match}. NAVIGATE_TO_PRODUCT:{product_id}
 
-DO NOT:
-- Ask questions about what they like about the food
-- Give multiple options
-- Include any taste profile analysis or percentages
-- Ask for preferences or additional information
-- Use any product IDs that are not in our menu data`;
+Example response:
+Based on the taste profile of "Shawarma", I recommend the Pepperoni Pizza from our menu. This dish shares similar characteristics with what you're looking for, particularly in terms of its savory umami flavor and rich, meaty profile. NAVIGATE_TO_PRODUCT:pizza2
+
+Remember: Only return the recommendation text followed by the navigation command. Do not include any taste profile analysis or percentages.`;
             
             const tasteModel = genAI.getGenerativeModel({ 
                 model: "gemini-2.0-flash-lite",
@@ -522,8 +490,6 @@ DO NOT:
                     maxOutputTokens: 500,
                 }
             });
-            
-            console.log('Sending taste prompt to Gemini:', tastePrompt.substring(0, 200) + '...');
             const tasteResult = await tasteModel.generateContent(tastePrompt);
             const tasteResponse = await tasteResult.response;
             const tasteText = tasteResponse.text();
@@ -707,7 +673,15 @@ app.post('/api/tts', async (req, res) => {
     }
 });
 
-// Start the server
-server.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-}); 
+// Start server
+async function startServer() {
+    try {
+        await testApiConnection();
+        server.listen(port, () => console.log(`Server running on ${port}`));
+    } catch (error) {
+        console.error('Server Error:', error);
+        process.exit(1);
+    }
+}
+
+startServer(); 
