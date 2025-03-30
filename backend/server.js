@@ -9,28 +9,27 @@ const { generateTasteProfile, findClosestMenuItem } = require('./taste_profile')
 require('dotenv').config();
 
 const app = express();
+const port = process.env.PORT || 3000;
 
 // CORS configuration
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: process.env.FRONTEND_URL || '*',
     methods: ['GET', 'POST'],
     credentials: true
 }));
 
 app.use(express.json());
 
-// Create WebSocket server
-let wss;
-try {
-    wss = new WebSocket.Server({ 
-        port: process.env.WS_PORT || 8080,
-        path: '/ws'
-    });
-    console.log(`WebSocket server started on port ${process.env.WS_PORT || 8080}`);
-} catch (error) {
-    console.error('Failed to start WebSocket server:', error);
-    process.exit(1);
-}
+// Create HTTP server
+const server = require('http').createServer(app);
+
+// Create WebSocket server attached to HTTP server
+const wss = new WebSocket.Server({ 
+    server,
+    path: '/ws'
+});
+
+console.log('WebSocket server initialized');
 
 // Store connected ESP32 clients with additional metadata
 const esp32Clients = new Map();
@@ -41,7 +40,10 @@ wss.on('connection', (ws, req) => {
     console.log(`New WebSocket connection from ${clientIp}`);
     
     // Send immediate welcome message
-    ws.send('SERVER_READY');
+    ws.send(JSON.stringify({
+        type: 'connection',
+        message: 'Connected to AI Menu Server'
+    }));
     
     // Setup ping-pong for connection keepalive
     ws.isAlive = true;
@@ -661,19 +663,7 @@ app.post('/api/tts', async (req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 3000;
-console.log('Environment PORT:', process.env.PORT);
-console.log('Using PORT:', PORT);
-
-// Start server
-async function startServer() {
-    try {
-        await testApiConnection();
-        app.listen(PORT, () => console.log(`Server running on ${PORT}`));
-    } catch (error) {
-        console.error('Server Error:', error);
-        process.exit(1);
-    }
-}
-
-startServer(); 
+// Start the server
+server.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+}); 

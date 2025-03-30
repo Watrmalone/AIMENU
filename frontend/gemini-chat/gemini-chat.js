@@ -70,55 +70,97 @@ const ChefChat = {
         const wsUrl = `${wsProtocol}//ai-menu-backend.onrender.com/ws`;
         
         console.log('Connecting to WebSocket:', wsUrl);
-        this.ws = new WebSocket(wsUrl);
+        
+        // Close existing connection if any
+        if (this.ws) {
+            this.ws.close();
+        }
 
-        this.ws.onopen = () => {
-            console.log('WebSocket connected');
-        };
+        try {
+            this.ws = new WebSocket(wsUrl);
 
-        this.ws.onclose = () => {
-            console.log('WebSocket disconnected, attempting to reconnect...');
-            setTimeout(() => this.initializeWebSocket(), 3000);
-        };
+            this.ws.onopen = () => {
+                console.log('WebSocket connected');
+                this.speechBubble.textContent = 'Connected to AI Menu Server';
+                this.speechBubble.classList.add('show');
+                setTimeout(() => {
+                    this.speechBubble.classList.remove('show');
+                }, 2000);
+            };
 
-        this.ws.onerror = (error) => {
-            console.error('WebSocket error:', error);
-        };
-
-        this.ws.onmessage = (event) => {
-            console.log('Received message:', event.data);
-            try {
-                const data = JSON.parse(event.data);
+            this.ws.onclose = (event) => {
+                console.log('WebSocket disconnected, attempting to reconnect...', event.code, event.reason);
+                this.speechBubble.textContent = 'Disconnected. Reconnecting...';
+                this.speechBubble.classList.add('show');
                 
-                if (data.type === 'navigation') {
-                    this.speechBubble.textContent = data.message;
-                    this.speakMessage(data.message);
-                    
-                    setTimeout(() => {
-                        window.location.href = `product.html?id=${data.productId}`;
-                    }, 1500);
-                } 
-                else if (data.type === 'info_and_navigate') {
-                    this.speechBubble.textContent = data.message;
-                    this.speakMessage(data.message);
-                    
-                    setTimeout(() => {
-                        window.location.href = `product.html?id=${data.productId}`;
-                    }, 5000);
-                }
-                else {
-                    this.speechBubble.textContent = data.message;
-                    this.speakMessage(data.message);
-                }
+                // Attempt to reconnect after 3 seconds
+                setTimeout(() => {
+                    if (this.ws.readyState === WebSocket.CLOSED) {
+                        this.initializeWebSocket();
+                    }
+                }, 3000);
+            };
 
-                // Trigger the scrolling text animation
-                window.dispatchEvent(new CustomEvent('gemini-response', {
-                    detail: { text: data.message }
-                }));
-            } catch (error) {
-                console.error('Error parsing WebSocket message:', error);
-            }
-        };
+            this.ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                this.speechBubble.textContent = 'Connection error. Retrying...';
+                this.speechBubble.classList.add('show');
+            };
+
+            this.ws.onmessage = (event) => {
+                console.log('Received message:', event.data);
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'connection') {
+                        console.log('Connection message:', data.message);
+                        return;
+                    }
+                    
+                    if (data.type === 'navigation') {
+                        this.speechBubble.textContent = data.message;
+                        this.speakMessage(data.message);
+                        
+                        setTimeout(() => {
+                            window.location.href = `product.html?id=${data.productId}`;
+                        }, 1500);
+                    } 
+                    else if (data.type === 'info_and_navigate') {
+                        this.speechBubble.textContent = data.message;
+                        this.speakMessage(data.message);
+                        
+                        setTimeout(() => {
+                            window.location.href = `product.html?id=${data.productId}`;
+                        }, 5000);
+                    }
+                    else {
+                        this.speechBubble.textContent = data.message;
+                        this.speakMessage(data.message);
+                    }
+
+                    // Trigger the scrolling text animation
+                    window.dispatchEvent(new CustomEvent('gemini-response', {
+                        detail: { text: data.message }
+                    }));
+                } catch (error) {
+                    console.error('Error parsing WebSocket message:', error);
+                    this.speechBubble.textContent = 'Error processing response';
+                    this.speechBubble.classList.add('show');
+                    setTimeout(() => {
+                        this.speechBubble.classList.remove('show');
+                    }, 3000);
+                }
+            };
+        } catch (error) {
+            console.error('Error creating WebSocket:', error);
+            this.speechBubble.textContent = 'Failed to connect. Retrying...';
+            this.speechBubble.classList.add('show');
+            
+            // Attempt to reconnect after 3 seconds
+            setTimeout(() => {
+                this.initializeWebSocket();
+            }, 3000);
+        }
     },
 
     // Initialize speech recognition
