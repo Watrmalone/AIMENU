@@ -135,16 +135,31 @@ const ChefChat = {
         this.isProcessing = true;
 
         try {
+            console.log('Sending request to backend:', transcript); // Debug log
             const response = await fetch('https://ai-menu-backend.onrender.com/api/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Origin': window.location.origin
                 },
-                body: JSON.stringify({ message: transcript })
+                credentials: 'include',
+                body: JSON.stringify({ 
+                    message: transcript,
+                    timestamp: new Date().toISOString()
+                })
             });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
 
             const data = await response.json();
             console.log('Received response:', data); // Debug log
+
+            if (!data || !data.message) {
+                throw new Error('Invalid response format from server');
+            }
 
             // Handle different response types
             if (data.type === 'navigation') {
@@ -180,18 +195,15 @@ const ChefChat = {
                 detail: { text: data.message }
             }));
 
+        } catch (error) {
+            console.error('Error in handleSpeechInput:', error);
+            this.speechBubble.textContent = `Error: ${error.message}. Please try again.`;
+            this.speechBubble.classList.add('show');
+        } finally {
             // Auto-hide speech bubble after 4 seconds
             setTimeout(() => {
                 this.speechBubble.classList.remove('show');
             }, 4000);
-
-        } catch (error) {
-            console.error('Error:', error);
-            this.speechBubble.textContent = 'Sorry, I encountered an error. Please try again.';
-            // Auto-hide error message after 3 seconds
-            setTimeout(() => {
-                this.speechBubble.classList.remove('show');
-            }, 3000);
         }
     },
 
@@ -239,74 +251,107 @@ const ChefChat = {
         const style = document.createElement('style');
         style.textContent = `
             #chef-chat-container {
-                position: fixed;
-                top: 20px;
-                left: 20px;
-                z-index: 9999;
+                position: fixed !important;
+                top: 20px !important;
+                left: 20px !important;
+                z-index: 9999 !important;
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
             }
 
             .chef-chat-button {
-                background: var(--accent);
-                color: #2C1810;
-                border: none;
-                padding: 12px 24px;
-                border-radius: 30px;
-                cursor: pointer;
-                font-weight: 600;
-                font-size: 16px;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                transition: all 0.3s ease;
-                box-shadow: 0 4px 15px rgba(212, 176, 140, 0.3);
-                width: 200px;
-                height: 45px;
-                justify-content: center;
-                white-space: nowrap;
+                background: var(--accent) !important;
+                color: #2C1810 !important;
+                border: none !important;
+                padding: 12px 24px !important;
+                border-radius: 30px !important;
+                cursor: pointer !important;
+                font-weight: 600 !important;
+                font-size: 16px !important;
+                text-transform: uppercase !important;
+                letter-spacing: 0.5px !important;
+                display: flex !important;
+                align-items: center !important;
+                gap: 8px !important;
+                transition: all 0.3s ease !important;
+                box-shadow: 0 4px 15px rgba(212, 176, 140, 0.3) !important;
+                width: 200px !important;
+                height: 45px !important;
+                justify-content: center !important;
+                white-space: nowrap !important;
             }
 
             .chef-hat-icon {
-                width: 24px;
-                height: 24px;
-                margin-right: 2px;
-                flex-shrink: 0;
+                width: 24px !important;
+                height: 24px !important;
+                margin-right: 2px !important;
+                flex-shrink: 0 !important;
             }
 
             .chef-chat-button span {
-                font-family: 'Poppins', sans-serif;
-                font-weight: 600;
-                margin-left: 2px;
+                font-family: 'Poppins', sans-serif !important;
+                font-weight: 600 !important;
+                margin-left: 2px !important;
             }
 
             .chef-chat-button:hover {
-                background: #E5C9B3;
-                transform: translateY(-2px);
-                box-shadow: 0 6px 20px rgba(212, 176, 140, 0.4);
+                background: #E5C9B3 !important;
+                transform: translateY(-2px) !important;
+                box-shadow: 0 6px 20px rgba(212, 176, 140, 0.4) !important;
             }
 
             .chef-chat-button.recording {
-                background: #E5C9B3;
-                animation: pulse 1.5s infinite;
-                box-shadow: 0 0 0 0 rgba(212, 176, 140, 0.4);
+                background: #E5C9B3 !important;
+                animation: pulse 1.5s infinite !important;
+                box-shadow: 0 0 0 0 rgba(212, 176, 140, 0.4) !important;
             }
 
             .speech-bubble {
-                position: absolute;
-                top: 60px;
-                left: 0;
-                background: white;
-                padding: 15px;
-                border-radius: 15px;
-                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-                max-width: 300px;
-                display: none;
-                z-index: 9999;
+                position: absolute !important;
+                top: 60px !important;
+                left: 0 !important;
+                background: rgba(44, 24, 16, 0.95) !important;
+                color: #D4B08C !important;
+                padding: 15px 20px !important;
+                border-radius: 15px !important;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
+                min-width: 250px !important;
+                max-width: 400px !important;
+                display: none !important;
+                z-index: 9999 !important;
+                font-size: 14px !important;
+                line-height: 1.5 !important;
+                transform: translateY(10px) !important;
+                transition: all 0.3s ease !important;
+                border: 1px solid rgba(212, 176, 140, 0.2) !important;
             }
 
-            .speech-bubble.active {
-                display: block;
+            .speech-bubble::before {
+                content: '' !important;
+                position: absolute !important;
+                top: -10px !important;
+                left: 20px !important;
+                border-left: 10px solid transparent !important;
+                border-right: 10px solid transparent !important;
+                border-bottom: 10px solid rgba(44, 24, 16, 0.95) !important;
+            }
+
+            .speech-bubble.show {
+                display: block !important;
+                transform: translateY(0) !important;
+                animation: fadeIn 0.3s ease !important;
+            }
+
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(10px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
             }
 
             @keyframes pulse {
